@@ -396,6 +396,7 @@
       fetchedData = null;
 
       const l1 = log('Connecting to Roblox API...');
+      log('⏱ Large histories may take minutes — rate limit delays applied automatically', 'active');
 
       try {
         const res = await fetch('/api/fetch-transactions', {
