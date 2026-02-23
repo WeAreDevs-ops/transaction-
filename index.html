@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Roblox Transaction Exporter</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@300;400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0c0f;
+      --surface: #111318;
+      --border: #1e2229;
+      --accent: #00e5a0;
+      --accent2: #0af;
+      --danger: #ff4560;
+      --text: #d0d8e8;
+      --muted: #4a5570;
+      --mono: 'Share Tech Mono', monospace;
+      --sans: 'Barlow', sans-serif;
+    }
+
+    html, body {
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-weight: 300;
+    }
+
+    /* Grid bg */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 40px 40px;
+      opacity: 0.4;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .wrap {
+      position: relative;
+      z-index: 1;
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 60px 24px 80px;
+    }
+
+    /* Header */
+    .header {
+      margin-bottom: 48px;
+    }
+    .header .tag {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--accent);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    .header h1 {
+      font-size: clamp(28px, 5vw, 42px);
+      font-weight: 700;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #fff 40%, var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .header p {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    /* Card */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 32px;
+      position: relative;
+      overflow: hidden;
+    }
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    }
+
+    /* Fields */
+    .field {
+      margin-bottom: 24px;
+    }
+    .field label {
+      display: block;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--accent);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .field input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .field input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(0,229,160,0.08);
+    }
+    .field input::placeholder { color: var(--muted); }
+
+    /* Warning */
+    .warning {
+      display: flex;
+      gap: 12px;
+      background: rgba(255,69,96,0.07);
+      border: 1px solid rgba(255,69,96,0.25);
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin-bottom: 28px;
+      font-size: 13px;
+      color: #ff8fa0;
+      line-height: 1.5;
+    }
+    .warning .icon { flex-shrink: 0; font-size: 16px; }
+
+    /* Button */
+    .btn {
+      width: 100%;
+      padding: 14px;
+      background: var(--accent);
+      color: #000;
+      font-family: var(--sans);
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+    .btn:hover { opacity: 0.9; }
+    .btn:active { transform: scale(0.99); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    /* Status */
+    #status {
+      margin-top: 28px;
+      display: none;
+    }
+
+    .status-bar {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+    .status-line {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .status-line:last-child { margin-bottom: 0; }
+    .status-line.active { color: var(--accent); }
+    .status-line.done { color: var(--text); }
+    .status-line.error { color: var(--danger); }
+
+    .spinner {
+      width: 10px; height: 10px;
+      border: 2px solid var(--accent);
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: inline-block;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+      flex-shrink: 0;
+    }
+
+    /* Results */
+    #results {
+      margin-top: 28px;
+      display: none;
+    }
+
+    .results-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .stat {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+    .stat .label {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .stat .value {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .btn-dl {
+      width: 100%;
+      padding: 13px;
+      background: transparent;
+      color: var(--accent2);
+      font-family: var(--sans);
+      font-weight: 600;
+      font-size: 14px;
+      letter-spacing: 0.04em;
+      border: 1px solid var(--accent2);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .btn-dl:hover {
+      background: rgba(0,170,255,0.1);
+    }
+
+    .btn-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    footer {
+      margin-top: 48px;
+      text-align: center;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <div class="tag">// Roblox Tool</div>
+      <h1>Transaction<br>Exporter</h1>
+      <p>Fetch and download your complete Roblox purchase transaction history — all pages, automatically paginated.</p>
+    </div>
+
+    <div class="card">
+      <div class="warning">
+        <span class="icon">⚠</span>
+        <span>Never share your <strong>.ROBLOSECURITY</strong> cookie with anyone. This tool processes it only server-side to call the Roblox API on your behalf.</span>
+      </div>
+
+      <div class="field">
+        <label>User ID</label>
+        <input type="text" id="userId" placeholder="e.g. 12345678" />
+      </div>
+
+      <div class="field">
+        <label>.ROBLOSECURITY Cookie</label>
+        <input type="password" id="roblosecurity" placeholder="Paste your cookie value here" />
+      </div>
+
+      <button class="btn" id="fetchBtn" onclick="startFetch()">
+        <span id="btnText">Fetch All Transactions</span>
+      </button>
+    </div>
+
+    <div id="status">
+      <div class="status-bar" id="statusBar"></div>
+    </div>
+
+    <div id="results">
+      <div class="results-card">
+        <div class="stats">
+          <div class="stat">
+            <div class="label">Transactions</div>
+            <div class="value" id="statTx">—</div>
+          </div>
+          <div class="stat">
+            <div class="label">Pages Fetched</div>
+            <div class="value" id="statPages">—</div>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn-dl" onclick="downloadJSON()">⬇ Download JSON</button>
+          <button class="btn-dl" onclick="downloadCSV()">⬇ Download CSV</button>
+        </div>
+      </div>
+    </div>
+
+    <footer>// data is never stored on the server</footer>
+  </div>
+
+  <script>
+    let fetchedData = null;
+
+    function log(msg, state = 'active') {
+      const bar = document.getElementById('statusBar');
+      const line = document.createElement('div');
+      line.className = `status-line ${state}`;
+
+      let icon = '';
+      if (state === 'active') icon = '<span class="spinner"></span>';
+      else if (state === 'done') icon = '<span class="dot"></span>';
+      else if (state === 'error') icon = '<span class="dot"></span>';
+
+      line.innerHTML = `${icon}<span>${msg}</span>`;
+      bar.appendChild(line);
+      return line;
+    }
+
+    function setLineState(el, state, msg) {
+      el.className = `status-line ${state}`;
+      const span = el.querySelector('span:last-child');
+      if (msg) span.textContent = msg;
+      const iconSpan = el.querySelector('span:first-child');
+      if (state === 'active') {
+        iconSpan.className = 'spinner';
+        iconSpan.innerHTML = '';
+      } else {
+        iconSpan.className = 'dot';
+        iconSpan.innerHTML = '';
+      }
+    }
+
+    async function startFetch() {
+      const userId = document.getElementById('userId').value.trim();
+      const robloxSecurity = document.getElementById('roblosecurity').value.trim();
+
+      if (!userId || !robloxSecurity) {
+        alert('Please fill in both fields.');
+        return;
+      }
+
+      const btn = document.getElementById('fetchBtn');
+      const btnText = document.getElementById('btnText');
+      btn.disabled = true;
+      btnText.textContent = 'Fetching...';
+
+      const statusDiv = document.getElementById('status');
+      const resultsDiv = document.getElementById('results');
+      statusDiv.style.display = 'block';
+      resultsDiv.style.display = 'none';
+      document.getElementById('statusBar').innerHTML = '';
+      fetchedData = null;
+
+      const l1 = log('Connecting to Roblox API...');
+
+      try {
+        const res = await fetch('/api/fetch-transactions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, robloxSecurity }),
+        });
+
+        setLineState(l1, 'done', 'Connected to Roblox API');
+        const l2 = log('Paginating all transactions...');
+
+        const json = await res.json();
+
+        if (!res.ok) {
+          setLineState(l2, 'error', `Error: ${json.error}`);
+          if (json.details) log(json.details, 'error');
+          btn.disabled = false;
+          btnText.textContent = 'Fetch All Transactions';
+          return;
+        }
+
+        setLineState(l2, 'done', `Fetched ${json.totalPages} page(s)`);
+        log(`Complete — ${json.totalTransactions} transactions found`, 'done');
+
+        fetchedData = json;
+        document.getElementById('statTx').textContent = json.totalTransactions.toLocaleString();
+        document.getElementById('statPages').textContent = json.totalPages;
+        resultsDiv.style.display = 'block';
+
+      } catch (err) {
+        log('Network error: ' + err.message, 'error');
+      }
+
+      btn.disabled = false;
+      btnText.textContent = 'Fetch Again';
+    }
+
+    function downloadJSON() {
+      if (!fetchedData) return;
+      const blob = new Blob([JSON.stringify(fetchedData.data, null, 2)], { type: 'application/json' });
+      triggerDownload(blob, `roblox_transactions_${Date.now()}.json`);
+    }
+
+    function downloadCSV() {
+      if (!fetchedData || !fetchedData.data.length) return;
+
+      const rows = fetchedData.data;
+      const headers = Object.keys(flattenObj(rows[0]));
+      const csv = [
+        headers.join(','),
+        ...rows.map(row => {
+          const flat = flattenObj(row);
+          return headers.map(h => {
+            const val = flat[h] ?? '';
+            return `"${String(val).replace(/"/g, '""')}"`;
+          }).join(',');
+        }),
+      ].join('\n');
+
+      const blob = new Blob([csv], { type: 'text/csv' });
+      triggerDownload(blob, `roblox_transactions_${Date.now()}.csv`);
+    }
+
+    function flattenObj(obj, prefix = '') {
+      return Object.keys(obj).reduce((acc, k) => {
+        const pre = prefix ? `${prefix}_${k}` : k;
+        if (obj[k] !== null && typeof obj[k] === 'object' && !Array.isArray(obj[k])) {
+          Object.assign(acc, flattenObj(obj[k], pre));
+        } else {
+          acc[pre] = obj[k];
+        }
+        return acc;
+      }, {});
+    }
+
+    function triggerDownload(blob, filename) {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+  </script>
+</body>
+</html>
