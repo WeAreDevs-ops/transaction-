@@ -8,6 +8,32 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+async function fetchPage(url, robloxSecurity, retries = 5) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    const response = await fetch(url, {
+      headers: {
+        'Cookie': `.ROBLOSECURITY=${robloxSecurity}`,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/json',
+        'Referer': 'https://www.roblox.com/',
+      },
+    });
+
+    if (response.status === 429) {
+      // Exponential backoff: 2s, 4s, 8s, 16s, 32s
+      const wait = Math.pow(2, attempt) * 1000;
+      console.log(`429 on attempt ${attempt}, waiting ${wait}ms...`);
+      await sleep(wait);
+      continue;
+    }
+
+    return response;
+  }
+  throw new Error('Too many 429s — Roblox is rate limiting heavily. Try again later.');
+}
+
 // POST /api/fetch-transactions
 // Body: { userId, robloxSecurity }
 app.post('/api/fetch-transactions', async (req, res) => {
@@ -21,23 +47,21 @@ app.post('/api/fetch-transactions', async (req, res) => {
   let cursor = null;
   let pageCount = 0;
 
+  // Increase timeout for long fetches (10 minutes)
+  req.setTimeout(600000);
+  res.setTimeout(600000);
+
   try {
     do {
-      const url = new URL(
+      const urlObj = new URL(
         `https://economy.roblox.com/v2/users/${userId}/transactions`
       );
-      url.searchParams.set('transactionType', 'Purchase');
-      url.searchParams.set('limit', '100');
-      url.searchParams.set('sortOrder', 'Asc');
-      if (cursor) url.searchParams.set('cursor', cursor);
+      urlObj.searchParams.set('transactionType', 'Purchase');
+      urlObj.searchParams.set('limit', '100');
+      urlObj.searchParams.set('sortOrder', 'Asc');
+      if (cursor) urlObj.searchParams.set('cursor', cursor);
 
-      const response = await fetch(url.toString(), {
-        headers: {
-          'Cookie': `.ROBLOSECURITY=${robloxSecurity}`,
-          'User-Agent': 'Mozilla/5.0',
-          'Accept': 'application/json',
-        },
-      });
+      const response = await fetchPage(urlObj.toString(), robloxSecurity);
 
       if (!response.ok) {
         const text = await response.text();
@@ -53,8 +77,13 @@ app.post('/api/fetch-transactions', async (req, res) => {
       cursor = json.nextPageCursor || null;
       pageCount++;
 
+      console.log(`Page ${pageCount}: got ${items.length} items, cursor=${cursor ? 'yes' : 'null'}`);
+
       // Safety cap: 500 pages (50,000 transactions)
       if (pageCount >= 500) break;
+
+      // Polite delay between requests: 600ms
+      if (cursor) await sleep(600);
 
     } while (cursor !== null);
 
